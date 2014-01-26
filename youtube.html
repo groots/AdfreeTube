@@ -15,19 +15,19 @@
 
     // private methods
     var ytVidId = function (url) {
+        var id;
         if (url !== undefined) {
             var p = /^(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?(?=.*v=((\w|-){11}))(?:\S+)?$/;
-            url = (url.match(p)) ? RegExp.$1 : false;
-	} else {
-            url = undefined;
-        }
-        return url;
+            id = (url.match(p)) ? RegExp.$1 : false;
+	    }
+        return id;
     },
     makeVidSrc = function () {
         if (AdlessTube.onpopstate()) {
-            var url = AdlessTube.onpopstate().url;
-            if (ytVidId(url)) {
-                url = 'http://www.youtube.com/embed/' + ytVidId(url);
+            var url = AdlessTube.onpopstate().url,
+                videoid = ytVidId(url);
+            if (videoid) {
+                url = 'http://www.youtube.com/embed/' + videoid;
             } else {
                 url = 'bad';
             }  
@@ -88,6 +88,7 @@
                     data: 'selected_url=' + $el.val(),
                     success:function(data){
                         console.log('This was sent back: ' + data);
+                        //console.log(AdlessTube.getYouTubeInfo(ytVidId($el.val())))
                         window.location.href = newURLString; 
                     }
                 });
@@ -95,8 +96,8 @@
                 AdlessTube.invalidURL($('.yt-info'));
             }
         });
-
     };
+    
 }(jQuery));
 
 window.onload = function () {
