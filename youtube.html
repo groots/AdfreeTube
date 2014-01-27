@@ -33,13 +33,26 @@
             }  
         }
         return url;
+    },
+    _parseResults = function (data) {
+        var title = data.entry.title.$t,
+            description = data.entry.media$group.media$description.$t,
+            viewcount = data.entry.yt$statistics.viewCount,
+            author = data.entry.author[0].name.$t;
+        $('.title').html('<h2>' + title + '</h2>');
+        $('.description').html('<span class="bold">Description</span>: ' + description);
+        $('.extrainfo').html('<span class="bold">Author</span>: ' + author + '<br/><span class="bold">Views</span>: ' + viewcount);
+        AdlessTube.getComments(data.entry.gd$comments.gd$feedLink.href + '&max-results=50&alt=json', 1);
     };
 
     // public methods
     AdlessTube.ifValidURL = function(url) {
         if (ytVidId(url) !== false) {
             $('.yt-info').addClass('fieldok').removeClass('fieldnotok').text('Valid URL');
+            $('.button-link-enter').fadeTo(1000,1);
+            AdlessTube.getYouTubeInfo(ytVidId(url));
         } else {
+            $('.button-link-enter').fadeTo(1000,0);
             $('.yt-info').removeClass('fieldok');
         }
     };
@@ -70,54 +83,104 @@
         if (vidSrc && vidSrc !== 'bad') {
             $el1.attr('src', vidSrc);
         } else if (vidSrc !== 'bad') {
-            AdlessTube.handleInput($('.youtube'));
+            AdlessTube.handleInput($('.youtube'), $('.button-link-enter'));
         } else {
             console.log('not a valid source');
         }
+        return this;
     };
-    AdlessTube.handleInput = function ($el) {
-        $el.parent().show();
-
-        $(document).keypress(function(e) {
-            if( e.which == 13 && ytVidId($el.val()) ) {
-                var newURLString = window.location.href + 
-                    "?url=" + $el.val();
-                $.ajax({
-                    type: "POST",
-                    url: "http://brandonminton.com/youtube_searches.php",
-                    data: 'selected_url=' + $el.val(),
-                    success:function(data){
-                        console.log('This was sent back: ' + data);
-                        //console.log(AdlessTube.getYouTubeInfo(ytVidId($el.val())))
-                        window.location.href = newURLString; 
-                    }
-                });
-            } else if (e.which == 13 && !ytVidId($el.val()) ) {
+    AdlessTube.handleInput = function ($input, $btn) {
+        $input.parent().show();
+        $input.keypress(function(e) {
+            if( e.which == 13 && ytVidId($input.val()) ) {
+                $btn.trigger('click');
+            } else if (e.which == 13 && !ytVidId($input.val()) ) {
                 AdlessTube.invalidURL($('.yt-info'));
             }
         });
+        $btn.click( function () {
+            var newURLString = window.location.href + 
+                "?url=" + $input.val();
+            $.ajax({
+                type: "POST",
+                url: "http://brandonminton.com/youtube_searches.php",
+                data: 'selected_url=' + $input.val(),
+                success:function(data){
+                    console.log('This was sent back: ' + data);
+                    window.location.href = newURLString; 
+                }
+            });
+        });
     };
-    
+    AdlessTube.getYouTubeInfo = function (url) {
+        $.ajax({
+            url: "http://gdata.youtube.com/feeds/api/videos/" + url + "?v=2&alt=json",
+            dataType: "jsonp",
+            success: function (data) { 
+                _parseResults(data);
+                $('.video-info').toggle();
+            }
+        });
+        return this;
+    };
+    AdlessTube.getComments = function (commentsURL, startIndex) {
+        $.ajax({
+            url: commentsURL + '&start-index=' + startIndex,
+            dataType: "jsonp",
+            success: function (data) {
+                $.each(data.feed.entry, function(key, val) {
+                        $('.comments').append('<br/><span class="bold">User: </span>' + val.author[0].name.$t + ', <span class="bold">Comment:</span> ' + val.content.$t);
+                });
+                if ($(data.feed.entry).size() == 50) { AdlessTube.getComments(commentsURL, startIndex + 50); }
+            }
+        });
+        return this;
+    };
+    AdlessTube.bindCommentsBtn = function ($el) {
+        $el.click(function() {
+            var that = this;
+            $(this).data('clicked', !$(this).data('clicked'));
+            if ($(this).data('clicked')) {
+                $( ".comments" ).show( "slow", function() {
+                    $(that).html('Hide Comments');
+                });
+            } else {
+                $( ".comments" ).hide( "slow", function() {
+                    $(that).html('Show Comments');
+                });
+            }
+        });
+        return this;
+    };
 }(jQuery));
 
 window.onload = function () {
-    $('.youtube').bind("change keyup input", function () {
-        var url = $(this).val();
+    $('.youtube').on('input', function(e) {
+        var url = this.value;
         AdlessTube.ifValidURL(url);
     });
-    AdlessTube.addVidSrc($('iframe'));
+    AdlessTube.addVidSrc($('iframe')).bindCommentsBtn($( ".show-comments-btn" ));
 };
 </script>
 <style type="text/css">
+.bold               {font-weight: bold;}
+.ital               {font-style: italic;}
 html,body           {height:100%;}
+input               {margin:10px 10px 0 0;width:270px;display: inline-block;float: left;clear: left;}
 .wrapper            {width:80%;height:100%;margin:0 auto;background:#CCC}
 .needinputyn        {display:none;}
-.yt-info            {display:none}
+.yt-info            {display:none;margin-top:10px;clear:left;}
 .yt-info.fieldok    {display:block;color:green;}
 .yt-info.fieldnotok {display:block;color:red;}
 .h_iframe           {position:relative;}
 .h_iframe .ratio    {display:block;width:100%;height:auto;}
 .h_iframe iframe    {position:absolute;top:0;left:0;width:100%; height:100%;}
+.comments           {display:none;}
+.video-info         {display:none;clear: left;margin-top: 50px;}
+.button-link {width:110px;text-align:center;padding: 10px 15px;background: #4479BA;color: #FFF;-webkit-border-radius: 4px;-moz-border-radius: 4px;border-radius: 4px;border: solid 1px #20538D;text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);-webkit-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 1px rgba(0, 0, 0, 0.2);-moz-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 1px rgba(0, 0, 0, 0.2);box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 1px rgba(0, 0, 0, 0.2);-webkit-transition-duration: 0.2s;-moz-transition-duration: 0.2s;transition-duration: 0.2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:pointer;}
+.button-link:hover {background: #356094;border: solid 1px #2A4E77;text-decoration: none;}
+.button-link:active {-webkit-box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.6);-moz-box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.6);box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.6);background: #2E5481;border: solid 1px #203E5F;}
+.button-link-enter  {display:none;float:left;}
 </style>
 <script>
   (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
@@ -136,9 +199,16 @@ html,body           {height:100%;}
         	<h1>Remove those damned ads NOW!</h1>
 Enter a YouTube URL here:
         <BR>
-        <input type="text" class="youtube" value="" />
+        <input type="text" class="youtube" value="" /><div class="button-link button-link-enter">Watch</div>
         <div class="yt-info">Valid URL</div>
         <br />
+        <div class="video-info">
+            <div class="title"></div>
+            <div class="description"></div>
+            <div class="extrainfo"></div>
+            <div class="show-comments-btn button-link">Show Comments</div>
+            <div class="comments"></div>
+        </div>
     </div>
     <div class="h_iframe">
         <!-- a transparent image is preferable -->
